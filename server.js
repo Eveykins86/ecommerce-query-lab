@@ -34,6 +34,7 @@ function displayMenu() {
             'View all departments',
             'View all roles',
             'View all employees',
+            'View employees by manager',
             'Add a department',
             'Add a role',
             'Add an employee',
@@ -53,6 +54,9 @@ function displayMenu() {
             break;
           case 'View all employees':
             viewAllEmployees();
+            break;
+          case 'View employees by manager':
+            viewEmployeesByManager();
             break;
           case 'Add a department':
             addDepartment();
@@ -123,6 +127,63 @@ function displayMenu() {
       }
       displayMenu();
     });
+  }
+
+  //Function to view wmployees by manager
+  function viewEmployeesByManager() {
+    const managerQuery = 'SELECT id, CONCAT(first_name, " ", last_name) AS managerName FROM employee WHERE manager_id IS NULL';
+
+    db.query(managerQuery, (err, managers) => {
+      if (err) {
+        console.error('Error fetching managers:', err);
+        displayMenu();
+        return;
+      }
+
+      //Promt the user to select a manager
+      inquirer
+        .prompt([
+          {
+            type: 'list',
+            name: 'managerId',
+            message: 'Select a manager to view their direct reports:',
+            choices: managers.map((manager) => ({
+              name: manager.managerName,
+              value: manager.id
+            }))
+          }
+        ])
+        .then((managerAnswers) => {
+          const managerId = managerAnswers.managerId;
+
+          //Fetch employees who report to the selected manager
+          const employeeQuery = `
+          SELECT 
+            e.id,
+            e.first_name,
+            e.last_name,
+            r.title AS Title,
+            d.name AS Department,
+            r.Salary
+          FROM employee e
+          LEFT JOIN role r ON e.role_id = r.id
+          LEFT JOIN departments d ON r.department_id = d.id
+          WHERE e.manager_id = ?
+        `;
+
+          db.query(employeeQuery, [managerId], (err, employees) => {
+          if (err) {
+            console.error('Error fetching employees:', err);
+            displayMenu();
+            return;
+          }
+          console.log(`Employees reporting to ${managers.find((manager) => manager.id === managerId).managerName}:`);
+          console.table(employees);
+          displayMenu()
+          });
+        });
+    });
+
   }
 
   //Function to add new Department
