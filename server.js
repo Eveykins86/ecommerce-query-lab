@@ -12,6 +12,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
 //Connects to the ecommerce_db database
+
 const db = mysql.createConnection(
   {
     host: 'localhost',
@@ -37,6 +38,7 @@ function displayMenu() {
             'Add a role',
             'Add an employee',
             'Update an employee role',
+            'Update an employee manager',
             'Exit'
           ]
         }
@@ -64,6 +66,9 @@ function displayMenu() {
           case 'Update an employee role':
             updateEmployeeRole();
             break;
+          case 'Update an employee manager':
+            updateEmployeeManager();
+            break;
           case 'Exit':
             console.log('Goodbye!');
             process.exit(0);
@@ -74,15 +79,17 @@ function displayMenu() {
       });
   }
 
+// Function to view all Departments
   function viewAllDepartments() {
     const departmentsQuery = "SELECT * from departments"
     db.query(departmentsQuery, (err, results) => {
       if (err) throw err;
       console.table(results);
+      displayMenu();
     })
-    displayMenu()
   }
 
+// Function to view all Roles
   function viewAllRoles() {
     const rolesQuery = "SELECT * from role"
     db.query(rolesQuery, (err, results) => {
@@ -92,15 +99,33 @@ function displayMenu() {
     })
   }
 
+// Function to view all employees
   function viewAllEmployees() {
-    const employeesQuery = "SELECT * from departments"
-    db.query(employeesQuery, (err, results) => {
-      if (err) throw err;
+    const query = `
+    SELECT 
+      e.id AS Employee_ID, 
+      e.first_name AS First_Name, 
+      e.last_name AS Last_Name, 
+      r.title AS Title, 
+      d.name AS Department, 
+      r.salary AS Salary, 
+      CONCAT(m.first_name, ' ', m.last_name) AS Manager
+    FROM employee e
+    LEFT JOIN role r ON e.role_id = r.id
+    LEFT JOIN departments d ON r.department_id = d.id
+    LEFT JOIN employee m ON e.manager_id = m.id;
+  `;
+    db.query(query, (err, results) => {
+      if (err) {
+        console.error('Error fetching employees:', err);
+      } else {
       console.table(results);
+      }
       displayMenu();
-    })
+    });
   }
 
+  //Function to add new Department
   function addDepartment() {
     inquirer
       .prompt([
@@ -134,6 +159,7 @@ function displayMenu() {
       });
   }
 
+  // Function to add new Role
   function addRole() {
       // Fetch the list of departments from the database
   const departmentQuery = 'SELECT id, name FROM departments';
@@ -199,38 +225,230 @@ function displayMenu() {
   });
   }
 
-  function addDepartment() {
-    inquirer
-      .prompt([
-        {
-          type: 'input',
-          name: 'departmentName',
-          message: 'Enter the name of the new department:',
-          validate: function (value) {
-            if (value.trim() !== '') {
-              return true;
-            }
-            return 'Please enter a valid department name.';
+  // Function to add new employee
+  function addEmployee() {
+    const roleQuery = 'SELECT id, title FROM role';
+    const employeeQuery = 'SELECT id, CONCAT(first_name, " ", last_name) AS manager FROM employee';
+    
+    db.query(roleQuery, (err, roles) => {
+      if (err) {
+        console.error('Error fetching roles:', err);
+        displayMenu();
+        return;
+      }
+  
+      db.query(employeeQuery, (err, employees) => {
+        if (err) {
+          console.error('Error fetching employees:', err);
+          displayMenu();
+          return;
+        }
+
+  inquirer
+    .prompt([
+      {
+        type: 'input',
+        name: 'firstName',
+        message: 'Enter the new employee FIRST name:',
+        validate: function (value) {
+          if (value.trim() !== '') {
+            return true;
           }
+          return 'Please enter a valid name.';
+        }
+      },
+      {
+        type: 'input',
+        name: 'lastName',
+        message: 'Enter the new employee LAST name:',
+        validate: function (value) {
+          if (value.trim() !== '') {
+            return true;
+          }
+          return 'Please enter a valid name.';
+        }
+      },
+      {
+        type: 'list',
+        name: 'roleId',
+        message: 'Select the role for this employee:',
+        choices: roles.map((role) => ({
+          name: role.title,
+          value: role.id
+        }))
+      },
+      {
+        type: 'list',
+        name: 'managerId',
+        message: 'Select the manager for this employee:',
+        choices: employees.map((employee) => ({
+          name: employee.manager,
+          value: employee.id
+        }))
+      }
+    ])
+    
+    .then((answers) => {
+       // Get the First, Last, and role ID entered by the user
+      const firstName = answers.firstName;
+      const lastName = answers.lastName;
+      const roleId = answers.roleId;
+      const managerId = answers.managerId;
+
+      // Insert the new employee into the database
+      const sql = 'INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)';
+      db.query(sql, [firstName, lastName, roleId, managerId], (err, result) => {
+        if (err) {
+          console.error('Error adding employee:', err);
+        } else {
+          console.log(`New employee '${firstName} ${lastName}' added successfully!`);
+        }
+        // Call displayMenu() to show the menu again
+        displayMenu();
+      });
+    });
+  });
+});
+}
+
+
+//Function to update employee role
+function updateEmployeeRole() {
+  const employeeQuery = 'SELECT id, CONCAT(first_name, " ", last_name) AS employeeName FROM employee';
+
+  db.query(employeeQuery, (err, employees) => {
+    if (err) {
+      console.error('Error fetching employees:', err);
+      displayMenu();
+      return;
+    }
+
+    //Prompt the user to select an employee
+  
+    inquirer
+      .prompt ([
+        {
+          type: 'list',
+          name: 'employeeId',
+          message: 'Select the employee to update:',
+          choices: employees.map((employee) => ({
+            name: employee.employeeName,
+            value: employee.id
+          }))
         }
       ])
-      .then((answers) => {
-        // Get the department name entered by the user
-        const departmentName = answers.departmentName;
-  
-        // Insert the new department into the database
-        const sql = 'INSERT INTO departments (name) VALUES (?)';
-        db.query(sql, [departmentName], (err, result) => {
+      .then((employeeAnswers) => {
+        const employeeId = employeeAnswers.employeeId;
+
+        //Fetch the list of roles from the database
+        const roleQuery = 'SELECT id, title FROM role';
+
+        db.query(roleQuery, (err, roles) => {
           if (err) {
-            console.error('Error adding department:', err);
-          } else {
-            console.log(`New department '${departmentName}' added successfully!`);
+            console.error('Error fetching roles:', err);
+            displayMenu();
+            return;
           }
-          // Call displayMenu() to show the menu again
-          displayMenu();
-        });
+
+          inquirer
+            .prompt([
+              {
+                type: 'list',
+                name: 'roleId',
+                message: 'Select the new role for the employee:',
+                choices: roles.map((role) => ({
+                  name: role.title,
+                  value: role.id
+                }))
+              }
+            ])
+            .then((roleAnswers) => {
+              const roleId = roleAnswers.roleId;
+
+              //Update the employee's role in the database
+              const updateQuery = 'UPDATE employee SET role_id = ? WHERE id = ?';
+              db.query(updateQuery, [roleId, employeeId], (err, result) => {
+                if (err) {
+                  console.error('Error updating employee role:', err);
+                } else {
+                  console.log('Employee\'s role updated successfully!')
+                }
+                displayMenu();
+              });
+            });
       });
-  }
+    });
+  });
+}
+
+// Function to update employee's manager
+function updateEmployeeManager() {
+  const employeeQuery = 'SELECT id, CONCAT(first_name, " ", last_name) AS employeeName FROM employee';
+
+  db.query(employeeQuery, (err, employees) => {
+    if (err) {
+      console.error('Error fetching employees:', err);
+      displayMenu();
+      return;
+    }
+
+    //Prompt the user to select an employee
+  
+    inquirer
+      .prompt ([
+        {
+          type: 'list',
+          name: 'employeeId',
+          message: 'Select the employee to update:',
+          choices: employees.map((employee) => ({
+            name: employee.employeeName,
+            value: employee.id
+          }))
+        }
+      ])
+      .then((employeeAnswers) => {
+        const employeeId = employeeAnswers.employeeId;
+
+        //Fetch the list of managers from employees
+        const managerQuery = 'SELECT id, CONCAT(first_name, " ", last_name) AS managerName FROM employee WHERE id <> ?';
+
+        db.query(managerQuery, [employeeId], (err, managers) => {
+          if (err) {
+            console.error('Error fetching managers:', err);
+            displayMenu();
+            return;
+          }
+
+          inquirer
+            .prompt([
+              {
+                type: 'list',
+                name: 'managerId',
+                message: 'Select the new manager for the employee:',
+                choices: managers.map((manager) => ({
+                  name: manager.managerName,
+                  value: manager.id
+                }))
+              }
+            ])
+            .then((managerAnswers) => {
+              const managerId = managerAnswers.managerId;
+
+              //Update the employee's manager in the database
+              const updateQuery = 'UPDATE employee SET manager_id = ? WHERE id = ?';
+              db.query(updateQuery, [managerId, employeeId], (err, result) => {
+                if (err) {
+                  console.error('Error updating employee manager:', err);
+                } else {
+                  console.log('Employee\'s manager updated successfully!')
+                }
+                displayMenu();
+              });
+            });
+      });
+    });
+  });
+}
   
 
 //Starts the server
