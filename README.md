@@ -1,7 +1,7 @@
 # e-commerce-query-lab
 
 ## Description
-A simple empoyee tracker for business owners. This application allows the user to add departments, roles, and employees. It also has the capability to update an employee's role and manager.
+A simple employee tracker for business owners. This application allows the user to add departments, roles, and employees. It also has the capability to update an employee's role and manager.
 
 ## Table of Contents
 - [Installation](#installation)
@@ -22,7 +22,9 @@ Use the arrow key to navigate through the menue. Select an option by hiting 'Ent
 Contact me for any contributions you may have.
 
 ## Tests
-None.
+Follow the link to see the application in action!
+
+https://drive.google.com/file/d/1pDBWtO7fTQtb7e_Xp80B6cEulEIbaqj2/view
 
 ## License
 ## License

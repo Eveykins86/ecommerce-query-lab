@@ -36,10 +36,14 @@ function displayMenu() {
             'View all employees',
             'View employees by manager',
             'Add a department',
+            'Delete a department',
             'Add a role',
+            'Delete a role',
             'Add an employee',
+            'Delete an employee',
             'Update an employee role',
             'Update an employee manager',
+            'View department budget',
             'Exit'
           ]
         }
@@ -61,17 +65,29 @@ function displayMenu() {
           case 'Add a department':
             addDepartment();
             break;
+            case 'Delete a department':
+              deleteDepartment();
+              break;
           case 'Add a role':
             addRole();
             break;
+          case 'Delete a role':
+            deleteRole();
+            break;
           case 'Add an employee':
             addEmployee();
+            break;
+          case 'Delete an employee':
+            deleteEmployee();
             break;
           case 'Update an employee role':
             updateEmployeeRole();
             break;
           case 'Update an employee manager':
             updateEmployeeManager();
+            break;
+          case 'View department budget':
+            viewDepartmentBudget();
             break;
           case 'Exit':
             console.log('Goodbye!');
@@ -220,6 +236,46 @@ function displayMenu() {
       });
   }
 
+    //Function to delete a department
+function deleteDepartment() {
+  const departmentsQuery = 'SELECT id, title FROM role';
+
+  db.query(departmentsQuery, (err, departments) => {
+    if (err) {
+      console.error('Error fetching departments:', err);
+      displayMenu();
+      return;
+    }
+
+  inquirer
+    .prompt([
+      {
+        type: 'list',
+        name: 'departmentName',
+        message: 'Select a department to delete:',
+        choices: departments.map((department) => ({
+            name: department.title,
+            value: department.id
+        }))
+      }
+    ])
+    .then((roleAnswers) => {
+      const roleId = roleAnswers.roleId;
+
+      //Delete the selected department from the database
+      const deleteQuery = 'DELETE FROM departments WHERE id = ?';
+      db.query(deleteQuery, [roleId], (err, result) => {
+        if (err) {
+          console.error('Error deleting department:', err);
+        } else {
+          console.log('Department deleted successfully!');
+        }
+        displayMenu();
+      });
+    });
+  });
+}
+
   // Function to add new Role
   function addRole() {
       // Fetch the list of departments from the database
@@ -285,6 +341,46 @@ function displayMenu() {
       });
   });
   }
+
+  //Function to delete a role
+function deleteRole() {
+  const roleQuery = 'SELECT id, title FROM role';
+
+  db.query(roleQuery, (err, roles) => {
+    if (err) {
+      console.error('Error fetching roles:', err);
+      displayMenu();
+      return;
+    }
+
+  inquirer
+    .prompt([
+      {
+        type: 'list',
+        name: 'roleTitle',
+        message: 'Select a role to delete:',
+        choices: roles.map((role) => ({
+            name: role.title,
+            value: role.id
+        }))
+      }
+    ])
+    .then((roleAnswers) => {
+      const roleId = roleAnswers.roleId;
+
+      //Delete the selected role from the database
+      const deleteQuery = 'DELETE FROM role WHERE id = ?';
+      db.query(deleteQuery, [roleId], (err, result) => {
+        if (err) {
+          console.error('Error deleting role:', err);
+        } else {
+          console.log('Role deleted successfully!');
+        }
+        displayMenu();
+      });
+    });
+  });
+}
 
   // Function to add new employee
   function addEmployee() {
@@ -372,6 +468,45 @@ function displayMenu() {
 });
 }
 
+//Function to delete an employee
+function deleteEmployee() {
+  const employeeQuery = 'SELECT id, CONCAT(first_name, " ", last_name) AS employeeName FROM employee'
+
+  db.query(employeeQuery, (err, employees) => {
+    if (err) {
+      console.error('Error fetching employees:', err);
+      displayMenu();
+      return;
+    }
+
+  inquirer
+    .prompt([
+      {
+        type: 'list',
+        name: 'employeeId',
+        message: 'Select an employee to delete:',
+        choices: employees.map((employee) => ({
+          name: employee.employeeName,
+          value: employee.id
+        }))
+      }
+    ])
+    .then((employeeAnswers) => {
+      const employeeId = employeeAnswers.employeeId;
+
+      //Delete the selected employee from the database
+      const deleteQuery = 'DELETE FROM employee WHERE id = ?';
+      db.query(deleteQuery, [employeeId], (err, result) => {
+        if (err) {
+          console.error('Error deleting employee:', err);
+        } else {
+          console.log('Employee deleted successfully!');
+        }
+        displayMenu();
+      });
+    });
+  });
+}
 
 //Function to update employee role
 function updateEmployeeRole() {
@@ -510,7 +645,52 @@ function updateEmployeeManager() {
     });
   });
 }
-  
+
+function viewDepartmentBudget() {
+  const departmentQuery = 'SELECT id, name FROM departments';
+
+  db.query(departmentQuery, (err, departments) => {
+    if (err) {
+      console.error('Error fetching departments:', err);
+      displayMenu();
+      return;
+    }
+
+    inquirer
+      .prompt([
+        {
+          type: 'list',
+          name: 'departmentId',
+          message: 'Select a department to view its budget:',
+          choices: departments.map((department) => ({
+            name: department.name,
+            value: department.id
+          }))
+        }
+      ])
+      .then((departmentAnswers) => {
+        const departmentId = departmentAnswers.departmentId;
+
+        //Calculate the total department budget (sum of salaries)
+        const budgetQuery = `
+        SELECT SUM(r.salary) AS total_budget
+        FROM employee e
+        LEFT JOIN role r ON e.role_id = r.id
+        WHERE r.department_id =?
+        `;
+
+        db.query(budgetQuery, [departmentId], (err, result) => {
+          if (err) {
+            console.error('Error calculating department budget:', err);
+          } else {
+            const totalBudget = result[0].total_budget;
+            console.log(`Total budget for ${departments.find((dept) => dept.id === departmentId).name}: $${totalBudget}`);
+          }
+          displayMenu();
+        });
+      });
+  });
+}
 
 //Starts the server
 app.listen(PORT, () => {
