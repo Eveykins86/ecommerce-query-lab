@@ -23,6 +23,24 @@ const db = mysql.createConnection(
   console.log(`Connected to the ecommerce_db database.`)
 );
 
+//Display main menu options
+const mainMenueChoises =[
+  'View All departments',
+  'View all roles',
+  'View all employees',
+  'View employees by manager',
+  'Add a department',
+  'Delete a department',
+  'Add a role',
+  'Delete a role',
+  'Add an employee',
+  'Delete an employee',
+  'Update an employee role',
+  'Update an employee manager',
+  'View departmet udget',
+  'Exit'
+];
+
 function displayMenu() {
     inquirer
       .prompt([
@@ -31,22 +49,9 @@ function displayMenu() {
           name: 'choice',
           message: 'Select an option:',
           choices: [
-            'View all departments',
-            'View all roles',
-            'View all employees',
-            'View employees by manager',
-            'Add a department',
-            'Delete a department',
-            'Add a role',
-            'Delete a role',
-            'Add an employee',
-            'Delete an employee',
-            'Update an employee role',
-            'Update an employee manager',
-            'View department budget',
-            'Exit'
-          ]
-        }
+            ...mainMenueChoises, 'Exit'
+          ],
+        },
       ])
       .then((answers) => {
         switch (answers.choice) {
@@ -65,9 +70,9 @@ function displayMenu() {
           case 'Add a department':
             addDepartment();
             break;
-            case 'Delete a department':
-              deleteDepartment();
-              break;
+          case 'Delete a department':
+            deleteDepartment();
+            break;
           case 'Add a role':
             addRole();
             break;
@@ -99,13 +104,33 @@ function displayMenu() {
       });
   }
 
+function returnToMainMenu() {
+    displayMenu(); // Display the main menu again
+  }
+
+  inquirer
+  .prompt([
+    {
+      type: 'list',
+      name: 'choice',
+      message: 'Select an option:',
+      choices: mainMenueChoises
+    }
+  ])
+  .then((answers) => {
+    if (answers.choice === 'Back to Main Menu') {
+      returnToMainMenu(); // Return to the main menu
+      return; // Exit this function
+    }
+  });
+
 // Function to view all Departments
   function viewAllDepartments() {
     const departmentsQuery = "SELECT * from departments"
     db.query(departmentsQuery, (err, results) => {
       if (err) throw err;
       console.table(results);
-      displayMenu();
+      displayMenu();s
     })
   }
 
@@ -145,35 +170,43 @@ function displayMenu() {
     });
   }
 
-  //Function to view wmployees by manager
-  function viewEmployeesByManager() {
-    const managerQuery = 'SELECT id, CONCAT(first_name, " ", last_name) AS managerName FROM employee WHERE manager_id IS NULL';
+// Function to view employees by manager
+function viewEmployeesByManager() {
+  const managerQuery = 'SELECT id, CONCAT(first_name, " ", last_name) AS managerName FROM employee WHERE manager_id IS NULL';
 
-    db.query(managerQuery, (err, managers) => {
-      if (err) {
-        console.error('Error fetching managers:', err);
-        displayMenu();
-        return;
-      }
+  db.query(managerQuery, (err, managers) => {
+    if (err) {
+      console.error('Error fetching managers:', err);
+      displayMenu();
+      return;
+    }
 
-      //Promt the user to select a manager
-      inquirer
-        .prompt([
-          {
-            type: 'list',
-            name: 'managerId',
-            message: 'Select a manager to view their direct reports:',
-            choices: managers.map((manager) => ({
+    // Prompt the user to select a manager
+    inquirer
+      .prompt([
+        {
+          type: 'list',
+          name: 'managerId',
+          message: 'Select a manager to view their direct reports:',
+          choices: [
+            'Back to Main Menu', // Separate option to go back
+            ...managers.map((manager) => ({
               name: manager.managerName,
               value: manager.id
             }))
-          }
-        ])
-        .then((managerAnswers) => {
-          const managerId = managerAnswers.managerId;
+          ]
+        }
+      ])
+      .then((managerAnswers) => {
+        const selectedManagerId = managerAnswers.managerId;
 
-          //Fetch employees who report to the selected manager
-          const employeeQuery = `
+        if (selectedManagerId === 'Back to Main Menu') {
+          displayMenu(); // Handle going back to the main menu
+          return;
+        }
+
+        // Fetch employees who report to the selected manager
+        const employeeQuery = `
           SELECT 
             e.id,
             e.first_name,
@@ -187,20 +220,19 @@ function displayMenu() {
           WHERE e.manager_id = ?
         `;
 
-          db.query(employeeQuery, [managerId], (err, employees) => {
+        db.query(employeeQuery, [selectedManagerId], (err, employees) => {
           if (err) {
             console.error('Error fetching employees:', err);
             displayMenu();
             return;
           }
-          console.log(`Employees reporting to ${managers.find((manager) => manager.id === managerId).managerName}:`);
+          console.log(`Employees reporting to ${managers.find((manager) => manager.id === selectedManagerId).managerName}:`);
           console.table(employees);
-          displayMenu()
-          });
+          displayMenu();
         });
-    });
-
-  }
+      });
+  });
+}
 
   //Function to add new Department
   function addDepartment() {
@@ -253,14 +285,22 @@ function deleteDepartment() {
         type: 'list',
         name: 'departmentName',
         message: 'Select a department to delete:',
-        choices: departments.map((department) => ({
+        choices: [
+          'Back to Main Menu', // Separate option to go back
+          ...departments.map((department) => ({
             name: department.title,
             value: department.id
-        }))
+          }))
+        ]
       }
     ])
     .then((roleAnswers) => {
-      const roleId = roleAnswers.roleId;
+      const selectedDepartmentId = roleAnswers.departmentName;
+
+      if (selectedDepartmentId === 'Back to Main Menu') {
+        displayMenu(); // Handle going back to the main menu
+        return;
+      }
 
       //Delete the selected department from the database
       const deleteQuery = 'DELETE FROM departments WHERE id = ?';
@@ -326,6 +366,10 @@ function deleteDepartment() {
         const roleTitle = answers.roletTitle;
         const roleSalary = parseFloat(answers.roleSalary);
         const departmentId = answers.departmentId;
+        if (selectedManagerId === 'Back to Main Menu') {
+          displayMenu(); // Handle going back to the main menu
+          return;
+        }
   
         // Insert the new role into the database
         const sql = 'INSERT INTO role (title, salary, department_id) VALUES (?, ?, ?)';
@@ -359,10 +403,13 @@ function deleteRole() {
         type: 'list',
         name: 'roleTitle',
         message: 'Select a role to delete:',
-        choices: roles.map((role) => ({
+        choices: [
+          'Back to Main Menu', // Separate option to go back
+          ...roles.map((role) => ({
             name: role.title,
             value: role.id
-        }))
+          }))
+        ]
       }
     ])
     .then((roleAnswers) => {
@@ -485,14 +532,21 @@ function deleteEmployee() {
         type: 'list',
         name: 'employeeId',
         message: 'Select an employee to delete:',
-        choices: employees.map((employee) => ({
-          name: employee.employeeName,
-          value: employee.id
-        }))
+        choices: [
+          'Back to Main Menu', // Separate option to go back
+          ...employees.map((employee) => ({
+            name: employee.employeeName,
+            value: employee.id
+          }))
+        ]
       }
     ])
     .then((employeeAnswers) => {
       const employeeId = employeeAnswers.employeeId;
+      if (employeeId === 'Back to Main Menu') {
+        displayMenu(); // Handle going back to the main menu
+        return;
+      }
 
       //Delete the selected employee from the database
       const deleteQuery = 'DELETE FROM employee WHERE id = ?';
@@ -692,10 +746,10 @@ function viewDepartmentBudget() {
   });
 }
 
+//Start the menu-based application
+displayMenu();
+
 //Starts the server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
-// Start the menu-based application
-displayMenu();
